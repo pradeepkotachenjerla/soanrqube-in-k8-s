@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ma2-sonar-service
+  namespace: commons
+spec:
+  podManagementPolicy: OrderedReady
+  replicas: 0
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: ma2-sonar-service
+  serviceName: ma2-sonar-service
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ma2-sonar-service
+      name: ma2-sonar-service
+    spec:
+      containers:
+      - env:
+        - name: SONARQUBE_SKIP_BOOTSTRAP
+          value: "true"
+        - name: SONARQUBE_PORT_NUMBER
+          value: "9000"
+        - name: SQ_DATA_DIR
+          value: /opt/sonarqube/data
+        image: sonarqube:9.9.0-community
+        imagePullPolicy: Always
+        name: ma2-sonar-service
+        ports:
+        - containerPort: 9000
+          name: sonar-server
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /opt/sonarqube/data
+          name: persistent-storage
+        - mountPath: /opt/sonarqube/conf/sonar.properties
+          name: config-batch
+          readOnly: true
+          subPath: sonar.properties
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+      - name: ma2-docker-credsrd
+      nodeSelector:
+        env: commons
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - effect: NoSchedule
+        key: env
+        operator: Equal
+        value: commons
+      volumes:
+      - name: persistent-storage
+        persistentVolumeClaim:
+          claimName: sonar-pvc
+      - configMap:
+          defaultMode: 420
+          name: ma2-sonar-service-config
+          optional: true
+        name: config-batch
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
